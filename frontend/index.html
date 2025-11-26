@@ -258,8 +258,8 @@
 </head>
 <body>
     <header>
-        <h1>🏠 Arc - Image to Model</h1>
-        <p>Real-time AI-powered wall and room scanner</p>
+        <h1>🏠 Arc</h1>
+        <p>AI Room Scanner</p>
     </header>
 
     <div class="container">
@@ -283,7 +283,7 @@
         </div>
 
         <div class="panel">
-            <h2>🎨 Room Model & Materials</h2>
+            <h2>🏠 3D Room Model</h2>
             
             <div class="model-viewer" id="model-viewer">
                 <canvas id="model-canvas" width="400" height="300" style="display: none;"></canvas>
@@ -292,9 +292,6 @@
                     <p style="font-size: 12px; margin-top: 10px;">Scan walls to generate model</p>
                 </div>
             </div>
-
-            <h3 style="margin-top: 25px; font-size: 1.1em; color: #ffffff; font-weight: 600;">Materials & Textures</h3>
-            <div class="materials" id="materials"></div>
 
             <h3 style="margin-top: 25px; font-size: 1.1em; color: #ffffff; font-weight: 600;">Scan Statistics</h3>
             <div class="stats">
@@ -325,34 +322,8 @@
         const statusEl = document.getElementById('status');
         const captureBtn = document.getElementById('capture-btn');
 
-        const materials = [
-            { name: 'White', color: '#FFFFFF' },
-            { name: 'Beige', color: '#F5E6D3' },
-            { name: 'Gray', color: '#A9A9A9' },
-            { name: 'Red Brick', color: '#C85A54' },
-            { name: 'Brown', color: '#8B4513' },
-            { name: 'Floral', color: '#E8D4F1' },
-            { name: 'Wood Lt', color: '#DEB887' },
-            { name: 'Wood Dk', color: '#654321' },
-        ];
-
-        function initMaterials() {
-            const materialsDiv = document.getElementById('materials');
-            materials.forEach((mat, idx) => {
-                const div = document.createElement('div');
-                div.className = 'material';
-                div.style.backgroundColor = mat.color;
-                div.innerHTML = `<span>${mat.name}</span>`;
-                div.onclick = () => selectMaterial(idx);
-                materialsDiv.appendChild(div);
-            });
-        }
-
-        function selectMaterial(idx) {
-            document.querySelectorAll('.material').forEach((el, i) => {
-                el.classList.toggle('selected', i === idx);
-            });
-        }
+        let wallCount = 0;
+        let roomData = [];
 
         let scanInterval;
         
@@ -457,7 +428,7 @@
                     
                     if (data.wall_detected) {
                         updateStatus('✅ Wall detected!', 'success');
-                        document.getElementById('wall-count').textContent = '1';
+                        document.getElementById('wall-count').textContent = wallCount;
                         document.getElementById('confidence').textContent = Math.round(data.confidence * 100) + '%';
                         
                         // Build 3D model
@@ -519,66 +490,81 @@
         }
 
         function build3DModel(wallData) {
+            wallCount++;
+            roomData.push(wallData);
+            
             const canvas = document.getElementById('model-canvas');
             const ctx = canvas.getContext('2d');
             const placeholder = document.getElementById('model-placeholder');
             
-            // Show canvas, hide placeholder
             canvas.style.display = 'block';
             placeholder.style.display = 'none';
             
-            // Clear canvas
-            ctx.fillStyle = '#1a1a2e';
+            // Clear and redraw
+            ctx.fillStyle = '#0f0f23';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw 3D-like wall representation
+            // Draw room based on wall count
             ctx.strokeStyle = '#00d4ff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
             
-            // Draw wall outline (perspective view)
+            if (wallCount === 1) {
+                // Single wall
+                drawWall(ctx, 50, 80, 300, 150);
+                ctx.fillText('Wall 1 detected', 20, 30);
+            } else if (wallCount === 2) {
+                // Corner (2 walls)
+                drawWall(ctx, 50, 80, 200, 150);
+                drawWall(ctx, 200, 80, 150, 200, true);
+                ctx.fillText('Corner detected', 20, 30);
+            } else if (wallCount >= 3) {
+                // Room (3+ walls)
+                drawRoom(ctx);
+                ctx.fillText(`Room with ${wallCount} walls`, 20, 30);
+            }
+            
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = '12px Inter';
+            ctx.fillText(`Confidence: ${Math.round(wallData.confidence * 100)}%`, 20, 280);
+        }
+        
+        function drawWall(ctx, x, y, w, h, vertical = false) {
             ctx.beginPath();
-            ctx.moveTo(50, 100);
-            ctx.lineTo(350, 100);
-            ctx.lineTo(380, 80);
-            ctx.lineTo(80, 80);
+            if (vertical) {
+                ctx.rect(x, y, 20, h);
+            } else {
+                ctx.rect(x, y, w, 20);
+            }
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        function drawRoom(ctx) {
+            // Draw 3D room
+            ctx.beginPath();
+            // Floor
+            ctx.moveTo(50, 200);
+            ctx.lineTo(300, 200);
+            ctx.lineTo(350, 150);
+            ctx.lineTo(100, 150);
             ctx.closePath();
+            ctx.fill();
             ctx.stroke();
             
-            // Draw wall face
-            ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
-            ctx.fill();
-            
-            // Draw side wall
+            // Walls
             ctx.beginPath();
-            ctx.moveTo(350, 100);
-            ctx.lineTo(380, 80);
-            ctx.lineTo(380, 200);
-            ctx.lineTo(350, 220);
+            ctx.moveTo(50, 200);
+            ctx.lineTo(50, 100);
+            ctx.lineTo(100, 50);
+            ctx.lineTo(100, 150);
             ctx.closePath();
             ctx.fillStyle = 'rgba(0, 212, 255, 0.05)';
             ctx.fill();
             ctx.stroke();
-            
-            // Draw floor
-            ctx.beginPath();
-            ctx.moveTo(50, 220);
-            ctx.lineTo(350, 220);
-            ctx.lineTo(380, 200);
-            ctx.lineTo(80, 200);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.fill();
-            ctx.stroke();
-            
-            // Add confidence text
-            ctx.fillStyle = '#00d4ff';
-            ctx.font = '14px Inter';
-            ctx.fillText(`Confidence: ${Math.round(wallData.confidence * 100)}%`, 20, 30);
-            ctx.fillText('3D Model Generated', 20, 280);
         }
         
         // Initialize
-        initMaterials();
         checkAPI();
         setInterval(checkAPI, 5000);
         
