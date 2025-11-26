@@ -232,6 +232,11 @@ def get_html_content():
             ctx.drawImage(video, 0, 0);
 
             canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    updateStatus('❌ Failed to capture image', 'error');
+                    return;
+                }
+                
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
 
@@ -240,6 +245,11 @@ def get_html_content():
                         method: 'POST',
                         body: formData
                     });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
                     const data = await response.json();
                     
                     if (data.wall_detected) {
@@ -256,6 +266,7 @@ def get_html_content():
                         updateStatus('🔍 No wall detected - try different angle', 'loading');
                     }
                 } catch (err) {
+                    console.error('Scan error:', err);
                     updateStatus('❌ Scan failed: ' + err.message, 'error');
                 }
             }, 'image/jpeg', 0.8);
@@ -405,9 +416,15 @@ def get_html_content():
 async def scan_frame(file: UploadFile = File(...)):
     """Process uploaded frame for wall detection."""
     try:
+        # Validate file
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image.")
+        
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
             content = await file.read()
+            if len(content) == 0:
+                raise HTTPException(status_code=400, detail="Empty file uploaded")
             tmp.write(content)
             tmp_path = tmp.name
         
