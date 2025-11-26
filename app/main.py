@@ -48,10 +48,17 @@ room_stitcher = RoomStitcher()
 model_exporter = ModelExporter()
 texture_library = TextureLibrary()
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def root():
     """Serve the main web interface."""
-    html_content = """
+    try:
+        return HTMLResponse(content=get_html_content())
+    except Exception as e:
+        return {"message": "Arc AI Wall Scanner", "error": str(e), "status": "running"}
+
+def get_html_content():
+    """Get the HTML content for the web interface."""
+    return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -393,7 +400,6 @@ async def root():
 </body>
 </html>
     """
-    return HTMLResponse(content=html_content)
 
 @app.post("/scan")
 async def scan_frame(file: UploadFile = File(...)):
@@ -520,6 +526,11 @@ async def apply_texture_endpoint(data: Dict[str, str]):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "Arc AI Wall Scanner"}
+
+@app.get("/test")
+async def test_route():
+    """Simple test route."""
+    return {"message": "Arc is running!", "status": "success"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT, debug=DEBUG)
