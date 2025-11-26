@@ -430,19 +430,41 @@ async def scan_frame(file: UploadFile = File(...)):
         
         # Load image
         frame = cv2.imread(tmp_path)
+        if frame is None:
+            os.remove(tmp_path)
+            raise HTTPException(status_code=400, detail="Could not read image file")
+            
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         os.remove(tmp_path)
         
-        # Process frame
-        segmentation = segment_wall(frame)
-        depth_map = estimate_depth(frame)
-        elements = detect_objects(frame)
+        # Process frame with error handling
+        try:
+            segmentation = segment_wall(frame)
+        except Exception as e:
+            print(f"Segmentation error: {e}")
+            segmentation = {"wall_detected": False, "confidence": 0.0, "bounds": None}
+            
+        try:
+            depth_map = estimate_depth(frame)
+        except Exception as e:
+            print(f"Depth estimation error: {e}")
+            depth_map = None
+            
+        try:
+            elements = detect_objects(frame)
+        except Exception as e:
+            print(f"Object detection error: {e}")
+            elements = {"total_elements": 0, "detections": []}
         
         # Create wall if detected
         wall = None
         if segmentation["wall_detected"]:
-            wall = create_wall_from_segmentation(segmentation, depth_map)
-            room_stitcher.add_wall(wall)
+            try:
+                wall = create_wall_from_segmentation(segmentation, depth_map)
+                room_stitcher.add_wall(wall)
+            except Exception as e:
+                print(f"Wall creation error: {e}")
+                # Continue without adding wall
         
         return {
             "wall_detected": segmentation["wall_detected"],
@@ -453,7 +475,10 @@ async def scan_frame(file: UploadFile = File(...)):
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Scan endpoint error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 @app.post("/detect_objects")
 async def detect_objects_endpoint(file: UploadFile = File(...)):
