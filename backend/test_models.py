@@ -11,28 +11,28 @@ try:
     print("Testing model imports...")
     
     from models.wall_detector import WallDetector
-    print("✓ WallDetector imported")
+    print("[OK] WallDetector imported")
     
     from models.element_detector import ElementDetector
-    print("✓ ElementDetector imported")
+    print("[OK] ElementDetector imported")
     
     from models.room_stitcher import RoomStitcher
-    print("✓ RoomStitcher imported")
+    print("[OK] RoomStitcher imported")
     
     print("\nInitializing models...")
     wall_detector = WallDetector()
-    print(f"✓ WallDetector initialized: {wall_detector.model_loaded}")
+    print(f"[OK] WallDetector initialized: {wall_detector.model_loaded}")
     
     element_detector = ElementDetector()
-    print(f"✓ ElementDetector initialized: {element_detector.model_loaded}")
+    print(f"[OK] ElementDetector initialized: {element_detector.model_loaded}")
     
     room_stitcher = RoomStitcher()
-    print("✓ RoomStitcher initialized")
+    print("[OK] RoomStitcher initialized")
     
-    print("\n✅ All models working correctly!")
+    print("\n[SUCCESS] All models working correctly!")
     
 except Exception as e:
-    print(f"\n❌ ERROR: {type(e).__name__}")
+    print(f"\n[ERROR] {type(e).__name__}")
     print(f"Message: {e}")
     import traceback
     traceback.print_exc()
