@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "arc-image-to-model"
+version = "0.1.0"
+description = "AI-powered wall and room scanner"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+python-multipart = "^0.0.6"
+opencv-python-headless = "^4.8.0"
+numpy = "^1.21.0"
+Pillow = "^9.0.0"
+python-dotenv = "^0.19.0"
+aiofiles = "^0.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
