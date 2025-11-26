@@ -6,3 +6,4 @@ Pillow
 python-dotenv
 aiofiles
 python-multipart
+tensorflow

@@ -4,19 +4,23 @@ from typing import Dict, Any
 
 class WallDetector:
     def __init__(self):
+        self.tf_available = False
+        self.model = None
+        
         try:
-            # Try to load TensorFlow and ResNet-50
             import tensorflow as tf
+            tf.get_logger().setLevel('ERROR')  # Reduce TF logging
             from tensorflow.keras.applications import ResNet50
             from tensorflow.keras.applications.resnet50 import preprocess_input
+            
             self.model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
             self.preprocess_input = preprocess_input
             self.tf_available = True
             print("WallDetector initialized with ResNet-50")
+        except ImportError:
+            print("TensorFlow not available, using OpenCV only")
         except Exception as e:
-            print(f"ResNet-50 not available, using enhanced CV: {e}")
-            self.model = None
-            self.tf_available = False
+            print(f"ResNet-50 loading failed: {e}")
         
         self.model_loaded = True
     
