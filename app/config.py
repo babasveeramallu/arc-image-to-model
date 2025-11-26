@@ -36,6 +36,7 @@ WALL_THICKNESS = 0.1  # meters
 DEFAULT_ROOM_HEIGHT = 2.5  # meters
 
 # Server settings
+import os
 HOST = "0.0.0.0"
-PORT = 8000
+PORT = int(os.getenv("PORT", 8000))
 DEBUG = True

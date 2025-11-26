@@ -28,7 +28,7 @@ try:
                 continue
         return 8000
     
-    port = find_free_port(8000)
+    port = int(os.getenv("PORT", find_free_port(8000)))
     
     print("🏠 Starting Arc - AI Wall Scanner")
     print(f"📡 Server will be available at: http://localhost:{port}")

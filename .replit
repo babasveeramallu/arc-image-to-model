@@ -1,4 +1,8 @@
-run = "pip install -r requirements_basic.txt && python run.py"
+run = "pip install --user -r requirements_basic.txt && python run.py"
 
 [nix]
 channel = "stable-22_11"
+
+[env]
+PYTHONPATH = "$PYTHONPATH:."
+PORT = "5000"
