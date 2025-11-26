@@ -1,7 +1,17 @@
-run = "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+run = "pip install -r requirements.txt && cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 [nix]
-channel = "stable-22_11"
+channel = "stable-23_11"
 
 [deployment]
-run = ["sh", "-c", "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+run = ["sh", "-c", "pip install -r requirements.txt && cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+[env]
+PYTHONPATH = "$PYTHONPATH:$PWD"
+
+[packager]
+language = "python3"
+
+[packager.features]
+packageSearch = true
+guessImports = true
