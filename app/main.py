@@ -503,13 +503,21 @@ async def detect_objects_endpoint(file: UploadFile = File(...)):
 async def stitch_walls(data: Dict[str, Any]):
     """Stitch multiple walls into room model."""
     try:
+        # Check if we have walls to stitch
+        if len(room_stitcher.walls) < 2:
+            return {
+                "success": False,
+                "error": f"Need at least 2 walls to build room. Currently have {len(room_stitcher.walls)} walls."
+            }
+        
         # Get current room model
         room_model = room_stitcher.stitch_walls(room_stitcher.walls)
         
         return {
             "success": True,
             "wall_count": len(room_model.walls),
-            "room_bounds": room_model.bounds
+            "room_bounds": room_model.bounds,
+            "message": f"Room built with {len(room_model.walls)} walls"
         }
         
     except Exception as e:
@@ -519,13 +527,16 @@ async def stitch_walls(data: Dict[str, Any]):
 async def export_glb_endpoint():
     """Export room model as GLB file."""
     try:
+        if len(room_stitcher.walls) == 0:
+            raise HTTPException(status_code=400, detail="No walls scanned yet. Scan at least one wall before exporting.")
+            
         room_model = room_stitcher.stitch_walls(room_stitcher.walls)
         file_path = model_exporter.export_glb(room_model)
         
         if os.path.exists(file_path):
-            return FileResponse(file_path, filename="room.glb")
+            return FileResponse(file_path, filename="room.glb", media_type="application/octet-stream")
         else:
-            raise HTTPException(status_code=404, detail="Export failed")
+            raise HTTPException(status_code=500, detail="Failed to generate GLB file")
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -534,13 +545,16 @@ async def export_glb_endpoint():
 async def export_obj_endpoint():
     """Export room model as OBJ file."""
     try:
+        if len(room_stitcher.walls) == 0:
+            raise HTTPException(status_code=400, detail="No walls scanned yet. Scan at least one wall before exporting.")
+            
         room_model = room_stitcher.stitch_walls(room_stitcher.walls)
         file_path = model_exporter.export_obj(room_model)
         
         if os.path.exists(file_path):
-            return FileResponse(file_path, filename="room.obj")
+            return FileResponse(file_path, filename="room.obj", media_type="text/plain")
         else:
-            raise HTTPException(status_code=404, detail="Export failed")
+            raise HTTPException(status_code=500, detail="Failed to generate OBJ file")
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

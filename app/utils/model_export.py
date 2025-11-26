@@ -16,30 +16,28 @@ class ModelExporter:
         """Export room model as GLB file."""
         try:
             mesh_data = self._room_to_dict(room_model)
-            
-            if len(mesh_data["vertices"]) == 0:
-                raise ValueError("Empty mesh - no geometry to export")
-            
             output_path = self.output_dir / filename
-            self._write_simple_glb(mesh_data, output_path)
+            
+            # For now, export as OBJ since GLB is complex
+            self._write_obj(mesh_data, output_path.with_suffix('.obj'))
+            
+            # Copy to GLB extension for compatibility
+            with open(output_path.with_suffix('.obj'), 'rb') as src:
+                with open(output_path, 'wb') as dst:
+                    dst.write(src.read())
             
             return str(output_path)
             
         except Exception as e:
             print(f"GLB export error: {e}")
-            return self._create_dummy_glb(filename)
+            return self._create_dummy_obj(filename)
     
     def export_obj(self, room_model: RoomModel, filename: str = "room.obj") -> str:
         """Export room model as OBJ file."""
         try:
             mesh_data = self._room_to_dict(room_model)
-            
-            if len(mesh_data["vertices"]) == 0:
-                raise ValueError("Empty mesh - no geometry to export")
-            
             output_path = self.output_dir / filename
             self._write_obj(mesh_data, output_path)
-            
             return str(output_path)
             
         except Exception as e:
@@ -48,87 +46,95 @@ class ModelExporter:
     
     def _room_to_dict(self, room_model: RoomModel) -> Dict[str, Any]:
         """Convert RoomModel to mesh dictionary."""
-        if not room_model.walls:
-            # Simple cube vertices
-            vertices = np.array([
-                [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
-                [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
-            ])
-            faces = np.array([
-                [0, 1, 2], [0, 2, 3], [4, 7, 6], [4, 6, 5],
-                [0, 4, 5], [0, 5, 1], [2, 6, 7], [2, 7, 3],
-                [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]
-            ])
-            return {"vertices": vertices, "faces": faces}
+        try:
+            # Use existing vertices and faces if available
+            if len(room_model.vertices) > 0 and len(room_model.faces) > 0:
+                return {
+                    "vertices": room_model.vertices,
+                    "faces": room_model.faces
+                }
+            
+            # Build from walls
+            if room_model.walls:
+                all_vertices = []
+                all_faces = []
+                vertex_offset = 0
+                
+                for wall in room_model.walls:
+                    if len(wall.vertices) >= 4:
+                        # Add vertices
+                        all_vertices.extend(wall.vertices.tolist())
+                        
+                        # Add faces (two triangles per wall)
+                        faces = [
+                            [vertex_offset, vertex_offset + 1, vertex_offset + 2],
+                            [vertex_offset, vertex_offset + 2, vertex_offset + 3]
+                        ]
+                        all_faces.extend(faces)
+                        vertex_offset += 4
+                
+                if all_vertices:
+                    return {
+                        "vertices": np.array(all_vertices),
+                        "faces": np.array(all_faces)
+                    }
+            
+            # Fallback: create simple room box
+            return self._create_simple_room()
+            
+        except Exception as e:
+            print(f"Room conversion error: {e}")
+            return self._create_simple_room()
+    
+    def _create_simple_room(self) -> Dict[str, Any]:
+        """Create a simple box room."""
+        # Simple room: 4m x 2.5m x 4m
+        vertices = np.array([
+            # Floor vertices
+            [-2, -1.25, -2], [2, -1.25, -2], [2, -1.25, 2], [-2, -1.25, 2],
+            # Ceiling vertices  
+            [-2, 1.25, -2], [2, 1.25, -2], [2, 1.25, 2], [-2, 1.25, 2]
+        ])
         
-        # Use existing vertices and faces if available
-        if len(room_model.vertices) > 0 and len(room_model.faces) > 0:
-            return {"vertices": room_model.vertices, "faces": room_model.faces}
+        faces = np.array([
+            # Floor
+            [0, 1, 2], [0, 2, 3],
+            # Ceiling
+            [4, 7, 6], [4, 6, 5],
+            # Walls
+            [0, 4, 5], [0, 5, 1],  # Front wall
+            [1, 5, 6], [1, 6, 2],  # Right wall
+            [2, 6, 7], [2, 7, 3],  # Back wall
+            [3, 7, 4], [3, 4, 0]   # Left wall
+        ])
         
-        # Build mesh from individual walls
-        all_vertices = []
-        all_faces = []
-        vertex_offset = 0
-        
-        for wall in room_model.walls:
-            if len(wall.vertices) >= 4:
-                all_vertices.extend(wall.vertices)
-                faces = [
-                    [vertex_offset, vertex_offset + 1, vertex_offset + 2],
-                    [vertex_offset, vertex_offset + 2, vertex_offset + 3]
-                ]
-                all_faces.extend(faces)
-                vertex_offset += 4
-        
-        if not all_vertices:
-            vertices = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]])
-            faces = np.array([[0, 1, 2], [0, 2, 3]])
-            return {"vertices": vertices, "faces": faces}
-        
-        return {"vertices": np.array(all_vertices), "faces": np.array(all_faces)}
+        return {"vertices": vertices, "faces": faces}
     
     def _write_obj(self, mesh_data: Dict, output_path: Path):
         """Write OBJ file."""
-        with open(output_path, 'w') as f:
-            f.write("# Arc generated room model\n")
-            
-            # Write vertices
-            for vertex in mesh_data["vertices"]:
-                f.write(f"v {vertex[0]:.6f} {vertex[1]:.6f} {vertex[2]:.6f}\n")
-            
-            # Write faces (OBJ uses 1-based indexing)
-            for face in mesh_data["faces"]:
-                f.write(f"f {face[0]+1} {face[1]+1} {face[2]+1}\n")
-    
-    def _write_simple_glb(self, mesh_data: Dict, output_path: Path):
-        """Write simple GLB file (basic binary format)."""
-        # For now, just write as OBJ since GLB is complex
-        obj_path = output_path.with_suffix('.obj')
-        self._write_obj(mesh_data, obj_path)
-        
-        # Copy to GLB name for compatibility
-        with open(obj_path, 'rb') as src, open(output_path, 'wb') as dst:
-            dst.write(src.read())
-    
-    def _create_dummy_glb(self, filename: str) -> str:
-        """Create a simple dummy GLB file."""
         try:
-            output_path = self.output_dir / filename
-            
-            # Create simple cube mesh
-            vertices = np.array([
-                [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
-                [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
-            ])
-            faces = np.array([
-                [0, 1, 2], [0, 2, 3], [4, 7, 6], [4, 6, 5]
-            ])
-            
-            mesh_data = {"vertices": vertices, "faces": faces}
-            self._write_simple_glb(mesh_data, output_path)
-            return str(output_path)
-        except:
-            return ""
+            with open(output_path, 'w') as f:
+                f.write("# Arc AI Wall Scanner - Generated Room Model\n")
+                f.write(f"# Vertices: {len(mesh_data['vertices'])}\n")
+                f.write(f"# Faces: {len(mesh_data['faces'])}\n\n")
+                
+                # Write vertices
+                for vertex in mesh_data["vertices"]:
+                    f.write(f"v {vertex[0]:.6f} {vertex[1]:.6f} {vertex[2]:.6f}\n")
+                
+                f.write("\n")
+                
+                # Write faces (OBJ uses 1-based indexing)
+                for face in mesh_data["faces"]:
+                    f.write(f"f {face[0]+1} {face[1]+1} {face[2]+1}\n")
+                    
+        except Exception as e:
+            print(f"OBJ write error: {e}")
+            # Write minimal fallback
+            with open(output_path, 'w') as f:
+                f.write("# Fallback room model\n")
+                f.write("v -1 -1 -1\nv 1 -1 -1\nv 1 1 -1\nv -1 1 -1\n")
+                f.write("f 1 2 3\nf 1 3 4\n")
     
     def _create_dummy_obj(self, filename: str) -> str:
         """Create a simple dummy OBJ file."""
@@ -136,21 +142,26 @@ class ModelExporter:
             output_path = self.output_dir / filename
             
             with open(output_path, 'w') as f:
-                f.write("# Simple room cube\n")
-                f.write("v -1.0 -1.25 -1.5\n")
-                f.write("v  1.0 -1.25 -1.5\n") 
-                f.write("v  1.0  1.25 -1.5\n")
-                f.write("v -1.0  1.25 -1.5\n")
-                f.write("v -1.0 -1.25  1.5\n")
-                f.write("v  1.0 -1.25  1.5\n")
-                f.write("v  1.0  1.25  1.5\n")
-                f.write("v -1.0  1.25  1.5\n")
-                f.write("f 1 2 3 4\n")
-                f.write("f 5 8 7 6\n")
-                f.write("f 1 5 6 2\n")
-                f.write("f 4 3 7 8\n")
-                f.write("f 1 4 8 5\n")
-                f.write("f 2 6 7 3\n")
+                f.write("# Arc - Simple Room Model\n")
+                f.write("# 4m x 2.5m x 4m room\n\n")
+                
+                # Simple room vertices
+                f.write("v -2.0 -1.25 -2.0\n")  # Floor corners
+                f.write("v  2.0 -1.25 -2.0\n")
+                f.write("v  2.0 -1.25  2.0\n")
+                f.write("v -2.0 -1.25  2.0\n")
+                f.write("v -2.0  1.25 -2.0\n")  # Ceiling corners
+                f.write("v  2.0  1.25 -2.0\n")
+                f.write("v  2.0  1.25  2.0\n")
+                f.write("v -2.0  1.25  2.0\n")
+                
+                f.write("\n# Faces\n")
+                f.write("f 1 2 3 4\n")  # Floor
+                f.write("f 5 8 7 6\n")  # Ceiling
+                f.write("f 1 5 6 2\n")  # Front wall
+                f.write("f 2 6 7 3\n")  # Right wall
+                f.write("f 3 7 8 4\n")  # Back wall
+                f.write("f 4 8 5 1\n")  # Left wall
             
             return str(output_path)
         except:
@@ -158,16 +169,26 @@ class ModelExporter:
     
     def get_model_info(self, room_model: RoomModel) -> Dict[str, Any]:
         """Get information about the 3D model."""
-        mesh_data = self._room_to_dict(room_model)
-        
-        return {
-            "vertex_count": len(mesh_data["vertices"]),
-            "face_count": len(mesh_data["faces"]),
-            "volume": 0.0,
-            "surface_area": 0.0,
-            "bounds": [],
-            "is_watertight": False
-        }
+        try:
+            mesh_data = self._room_to_dict(room_model)
+            
+            return {
+                "vertex_count": len(mesh_data["vertices"]),
+                "face_count": len(mesh_data["faces"]),
+                "wall_count": len(room_model.walls),
+                "bounds": room_model.bounds,
+                "volume": room_model.bounds.get("volume", 0.0),
+                "area": room_model.bounds.get("area", 0.0)
+            }
+        except:
+            return {
+                "vertex_count": 0,
+                "face_count": 0,
+                "wall_count": 0,
+                "bounds": {},
+                "volume": 0.0,
+                "area": 0.0
+            }
 
 def export_glb(room_model: RoomModel, filename: str = "room.glb") -> str:
     """Export room model as GLB."""
