@@ -37,7 +37,7 @@ if %errorlevel% neq 0 (
 
 REM Push to GitHub
 echo Pushing to GitHub...
-git push -u origin main
+git push -u origin master
 
 echo.
 echo ===== SUCCESS =====
