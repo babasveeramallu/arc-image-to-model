@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc - Image to Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            opacity: 0.9;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            flex: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .camera-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-fallback {
+            color: white;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .model-viewer {
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            min-height: 300px;
+            color: #999;
+        }
+
+        .status {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .status.loading {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .materials {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .material {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 5px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .material:hover {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .material.selected {
+            border-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+        }
+
+        .material span {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 10px;
+            padding: 4px;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-box .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-box .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🏠 Arc - Image to Model</h1>
+        <p>Real-time AI-powered wall and room scanner</p>
+    </header>
+
+    <div class="container">
+        <div class="panel">
+            <h2>📷 Camera Scan</h2>
+            <div class="status" id="status">Ready to scan</div>
+            
+            <div class="camera-container">
+                <video id="camera" playsinline></video>
+                <div class="camera-fallback" id="camera-fallback" style="display: none;">
+                    <p>📷 Camera not available</p>
+                    <p style="font-size: 12px; margin-top: 10px; opacity: 0.7;">Enable camera access to start scanning</p>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button onclick="startCamera()">Start Camera</button>
+                <button onclick="captureFrame()" id="capture-btn" disabled>Capture Frame</button>
+                <button onclick="stopCamera()">Stop</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🎨 Room Model & Materials</h2>
+            
+            <div class="model-viewer">
+                <div style="text-align: center; color: #999;">
+                    <p>📊 3D Model Preview</p>
+                    <p style="font-size: 12px; margin-top: 10px;">Scan walls to generate model</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 15px; font-size: 14px; color: #333;">Materials & Textures</h3>
+            <div class="materials" id="materials"></div>
+
+            <h3 style="margin-top: 15px; font-size: 14px; color: #333;">Scan Statistics</h3>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="label">Walls Detected</div>
+                    <div class="value" id="wall-count">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Elements Found</div>
+                    <div class="value" id="element-count">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Confidence</div>
+                    <div class="value" id="confidence">0%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Status</div>
+                    <div class="value" id="api-status">⚠️</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const video = document.getElementById('camera');
+        const cameraFallback = document.getElementById('camera-fallback');
+        const statusEl = document.getElementById('status');
+        const captureBtn = document.getElementById('capture-btn');
+
+        const materials = [
+            { name: 'White', color: '#FFFFFF' },
+            { name: 'Beige', color: '#F5E6D3' },
+            { name: 'Gray', color: '#A9A9A9' },
+            { name: 'Red Brick', color: '#C85A54' },
+            { name: 'Brown', color: '#8B4513' },
+            { name: 'Floral', color: '#E8D4F1' },
+            { name: 'Wood Lt', color: '#DEB887' },
+            { name: 'Wood Dk', color: '#654321' },
+        ];
+
+        // Initialize materials
+        function initMaterials() {
+            const materialsDiv = document.getElementById('materials');
+            materials.forEach((mat, idx) => {
+                const div = document.createElement('div');
+                div.className = 'material';
+                div.style.backgroundColor = mat.color;
+                div.innerHTML = `<span>${mat.name}</span>`;
+                div.onclick = () => selectMaterial(idx);
+                materialsDiv.appendChild(div);
+            });
+        }
+
+        function selectMaterial(idx) {
+            document.querySelectorAll('.material').forEach((el, i) => {
+                el.classList.toggle('selected', i === idx);
+            });
+        }
+
+        // Camera functions
+        async function startCamera() {
+            try {
+                updateStatus('Starting camera...', 'loading');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1080 },
+                        height: { ideal: 1920 }
+                    }
+                });
+                video.srcObject = stream;
+                cameraFallback.style.display = 'none';
+                video.style.display = 'block';
+                captureBtn.disabled = false;
+                updateStatus('Camera ready', 'success');
+            } catch (err) {
+                cameraFallback.style.display = 'flex';
+                video.style.display = 'none';
+                updateStatus('Camera error: ' + err.message, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            captureBtn.disabled = true;
+            updateStatus('Camera stopped', 'loading');
+        }
+
+        async function captureFrame() {
+            if (!video.srcObject) return;
+
+            try {
+                updateStatus('Processing frame...', 'loading');
+                captureBtn.disabled = true;
+
+                // Create canvas and capture frame
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+
+                // Convert to blob and send to API
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'frame.jpg');
+
+                    try {
+                        const response = await fetch(`${API_BASE}/api/scan/wall`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        
+                        if (data.wall_detected) {
+                            updateStatus('Wall detected! ✓', 'success');
+                            document.getElementById('wall-count').textContent = '1';
+                            document.getElementById('confidence').textContent = Math.round(data.confidence * 100) + '%';
+                        } else {
+                            updateStatus('No wall detected in this frame', 'loading');
+                        }
+
+                        // Try element detection
+                        await detectElements(blob);
+                    } catch (err) {
+                        updateStatus('API error: ' + err.message, 'error');
+                    }
+                    captureBtn.disabled = false;
+                }, 'image/jpeg', 0.9);
+            } catch (err) {
+                updateStatus('Error: ' + err.message, 'error');
+                captureBtn.disabled = false;
+            }
+        }
+
+        async function detectElements(blob) {
+            try {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                const response = await fetch(`${API_BASE}/api/detect/elements`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                const count = data.total_elements || 0;
+                document.getElementById('element-count').textContent = count;
+            } catch (err) {
+                console.error('Element detection error:', err);
+            }
+        }
+
+        function updateStatus(message, type = 'loading') {
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+
+        async function checkAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    document.getElementById('api-status').textContent = '✅';
+                    document.getElementById('api-status').style.color = '#28a745';
+                } else {
+                    document.getElementById('api-status').textContent = '❌';
+                    document.getElementById('api-status').style.color = '#dc3545';
+                }
+            } catch (err) {
+                document.getElementById('api-status').textContent = '❌';
+                document.getElementById('api-status').style.color = '#dc3545';
+            }
+        }
+
+        // Initialize
+        initMaterials();
+        checkAPI();
+        setInterval(checkAPI, 5000); // Check API every 5 seconds
+    </script>
+</body>
+</html>
