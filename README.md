@@ -1,84 +1,39 @@
-# Arc - Image to Model Tool
+# Arc — Python Real-Time Wall & Room Scanner AI Tool
 
-An AI-powered real-time wall and room scanner that converts 2D camera feed into accurate 3D models with material and texture customization.
+Arc uses AI to scan walls in real-time, detect elements (outlets, switches, windows, doors), and create 3D room models.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# 1. Navigate to project
-cd "Arc - Image to Model Tool"
-
-# 2. Start backend
-cd backend
-.\venv\Scripts\python -m uvicorn app.main:app --reload
-
-# 3. Open in browser
-# http://localhost:8000
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python app/main.py
 ```
 
-## 📁 Project Structure
+Open http://localhost:8000 in your browser.
 
-```
-Arc - Image to Model Tool/
-├── backend/
-│   ├── app/
-│   │   └── main.py           # FastAPI server
-│   ├── venv/                 # Python virtual environment
-│   └── requirements.txt       # Python dependencies
-├── frontend/
-│   └── index.html            # Web app (self-contained)
-├── models/
-│   ├── wall_detector.py      # Wall detection AI
-│   ├── element_detector.py   # Element detection AI
-│   └── room_stitcher.py      # Room stitching AI
-├── docs/
-│   └── API.md                # API documentation
-├── .gitignore
-└── README.md
-```
+## Features
 
-## ✨ Features
+- Real-time wall scanning via webcam/phone camera
+- AI-powered element detection (outlets, switches, windows, doors)
+- Depth estimation and 3D wall modeling
+- Multi-wall stitching for complete rooms
+- Material/texture application
+- GLB/OBJ export
 
-- 📷 Real-time camera feed scanning
-- 🎯 Wall detection and segmentation
-- 🔍 Element detection (outlets, switches, windows, doors)
-- 🏠 3D room model generation
-- 🎨 Material and texture library (8 options)
-- 📊 Live statistics display
-- 🔗 REST API endpoints
+## Architecture
 
-## 🌐 Access
+- **FastAPI** backend with WebRTC camera support
+- **YOLOv8** for object detection
+- **MiDaS** for depth estimation
+- **OpenCV** for wall segmentation
+- **Three.js** for 3D visualization
+- **Trimesh** for 3D model generation
 
-**Web App:** http://localhost:8000
+## API Endpoints
 
-**API Docs:** http://localhost:8000/docs
-
-**Health Check:** http://localhost:8000/health
-
-## 📝 API Endpoints
-
-- `GET /health` - Health check
-- `GET /` - Web app (HTML)
-- `POST /api/scan/wall` - Scan and detect walls
-- `POST /api/detect/elements` - Detect wall elements
-- `POST /api/stitch/rooms` - Stitch multiple walls
-
-## 🔧 Development
-
-Backend is hot-reloading. Edit `backend/app/main.py` and changes apply automatically.
-
-Frontend is in `frontend/index.html`. Refresh browser to see changes.
-
-AI models in `models/` folder ready to improve with TensorFlow/YOLO.
-
-## 📅 Deadline
-
-**Nov 29, 2025 @ 12:30pm CST**
-
-## 📖 Documentation
-
-See `docs/API.md` for complete API documentation.
-
----
-
-Built for SPA Bhopal Hackathon 2025
+- `POST /scan` - Process camera frame
+- `POST /detect_objects` - Detect wall elements
+- `POST /stitch` - Merge multiple walls
+- `GET /export/glb` - Export 3D model
