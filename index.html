@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc - AI Room Scanner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+            min-height: 100vh; color: #e0e6ed;
+        }
+        header { 
+            background: rgba(15, 15, 35, 0.95); padding: 20px; text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        header h1 { 
+            font-size: 2em; font-weight: 700; color: #00d4ff; margin-bottom: 5px;
+        }
+        .container { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; 
+            padding: 20px; max-width: 1200px; margin: 0 auto;
+        }
+        .panel { 
+            background: rgba(26, 26, 46, 0.8); border-radius: 15px; padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .panel h2 { color: #fff; font-size: 1.3em; margin-bottom: 15px; }
+        .camera-container { 
+            background: #000; border-radius: 10px; position: relative;
+            min-height: 300px; display: flex; align-items: center; justify-content: center;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .controls { display: flex; gap: 10px; margin-top: 15px; }
+        button { 
+            padding: 12px 20px; background: linear-gradient(135deg, #00d4ff, #5b86e5);
+            color: white; border: none; border-radius: 8px; cursor: pointer;
+            font-weight: 600; flex: 1; transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { background: #333; cursor: not-allowed; transform: none; }
+        .status { 
+            padding: 15px; border-radius: 8px; margin-bottom: 15px; font-weight: 500;
+        }
+        .status.success { background: rgba(40, 167, 69, 0.2); color: #4caf50; }
+        .status.error { background: rgba(220, 53, 69, 0.2); color: #f44336; }
+        .status.loading { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .model-viewer { 
+            background: #1a1a2e; border-radius: 10px; min-height: 250px;
+            display: flex; align-items: center; justify-content: center; color: #999;
+        }
+        canvas { border-radius: 10px; }
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .stat-box { 
+            background: rgba(15, 15, 35, 0.6); padding: 15px; border-radius: 8px; text-align: center;
+        }
+        .stat-box .label { font-size: 11px; color: #999; margin-bottom: 5px; }
+        .stat-box .value { font-size: 18px; font-weight: 700; color: #00d4ff; }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🏠 Arc</h1>
+        <p>AI Room Scanner</p>
+    </header>
+
+    <div class="container">
+        <div class="panel">
+            <h2>📷 Camera Scan</h2>
+            <div class="status" id="status">Ready to scan</div>
+            
+            <div class="camera-container">
+                <video id="camera" playsinline autoplay muted style="display: none;"></video>
+                <div id="camera-fallback">📷 Click Start Camera</div>
+            </div>
+
+            <div class="controls">
+                <button onclick="startCamera()">Start Camera</button>
+                <button onclick="captureFrame()" id="capture-btn" disabled>Scan Wall</button>
+                <button onclick="stopCamera()">Stop</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🏠 3D Room Model</h2>
+            
+            <div class="model-viewer">
+                <canvas id="model-canvas" width="350" height="250" style="display: none;"></canvas>
+                <div id="model-placeholder">📊 Scan walls to build 3D model</div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="label">Walls Found</div>
+                    <div class="value" id="wall-count">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Confidence</div>
+                    <div class="value" id="confidence">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('camera');
+        const statusEl = document.getElementById('status');
+        const captureBtn = document.getElementById('capture-btn');
+        let wallCount = 0;
+
+        function updateStatus(msg, type = 'loading') {
+            statusEl.textContent = msg;
+            statusEl.className = 'status ' + type;
+        }
+
+        async function startCamera() {
+            updateStatus('Starting camera...', 'loading');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: { ideal: 'environment' } } 
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('camera-fallback').style.display = 'none';
+                captureBtn.disabled = false;
+                updateStatus('Camera ready!', 'success');
+            } catch (err) {
+                updateStatus('Camera error: ' + err.message, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            video.style.display = 'none';
+            document.getElementById('camera-fallback').style.display = 'block';
+            captureBtn.disabled = true;
+            updateStatus('Camera stopped', 'loading');
+        }
+
+        async function captureFrame() {
+            if (!video.srcObject) return;
+            
+            updateStatus('Scanning wall...', 'loading');
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                try {
+                    const response = await fetch('/api/scan/wall', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.wall_detected) {
+                        wallCount++;
+                        updateStatus('✅ Wall detected!', 'success');
+                        document.getElementById('wall-count').textContent = wallCount;
+                        document.getElementById('confidence').textContent = Math.round(data.confidence * 100) + '%';
+                        build3DModel();
+                    } else {
+                        updateStatus('🔍 No wall found - try different angle', 'loading');
+                    }
+                } catch (err) {
+                    updateStatus('❌ Scan failed: ' + err.message, 'error');
+                }
+            }, 'image/jpeg', 0.8);
+        }
+
+        function build3DModel() {
+            const canvas = document.getElementById('model-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.style.display = 'block';
+            document.getElementById('model-placeholder').style.display = 'none';
+            
+            // Clear canvas
+            ctx.fillStyle = '#0f0f23';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw 3D room based on wall count
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
+            
+            if (wallCount === 1) {
+                // Single wall
+                ctx.fillRect(50, 80, 250, 100);
+                ctx.strokeRect(50, 80, 250, 100);
+            } else if (wallCount === 2) {
+                // Corner
+                ctx.fillRect(50, 80, 150, 100);
+                ctx.strokeRect(50, 80, 150, 100);
+                ctx.fillRect(200, 80, 100, 150);
+                ctx.strokeRect(200, 80, 100, 150);
+            } else {
+                // Full room
+                ctx.beginPath();
+                ctx.moveTo(50, 180);
+                ctx.lineTo(300, 180);
+                ctx.lineTo(320, 160);
+                ctx.lineTo(70, 160);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // Walls
+                ctx.fillRect(50, 80, 250, 100);
+                ctx.strokeRect(50, 80, 250, 100);
+            }
+            
+            // Add text
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(`${wallCount} wall${wallCount > 1 ? 's' : ''} detected`, 10, 20);
+        }
+    </script>
+</body>
+</html>
